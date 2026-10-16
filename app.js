@@ -1,7 +1,7 @@
 /* Glamis Staff Help: unlocks the encrypted content bundle and renders it. */
 (function () {
   'use strict';
-  var VER = 'e4307cb45d';
+  var VER = '44da538d8f';
   var K_KEY = 'gdrh.k', K_SALT = 'gdrh.s', K_LANG = 'gdrh.lang', K_CL = 'gdrh.cl.';
   var GROUPS = ['checklist', 'howto', 'handbook', 'quickref'];
 
@@ -29,7 +29,8 @@
       untranslated: "This page isn't in Spanish yet, so it's showing in English.",
       notFound: "That page doesn't exist.", backHome: 'Go to the home page',
       foot: 'Glamis Dunes Rentals · glamisrent.com · (760) 573-6825 · Staff only',
-      built: 'Site updated'
+      built: 'Site updated',
+      dl: 'Download PDF', dlCap: 'The one-page sheet, to print and fill in by hand.', dlWorking: 'Preparing…', dlFail: "Couldn't download it. Check your connection and try again."
     },
     es: {
       app: 'Ayuda al personal', appShort: 'Ayuda', lockSub: 'Glamis Dunes Rentals · solo personal', pw: 'Contraseña del personal', show: 'Ver',
@@ -54,11 +55,12 @@
       untranslated: 'Esta página aún no está en español, así que se muestra en inglés.',
       notFound: 'Esa página no existe.', backHome: 'Ir al inicio',
       foot: 'Glamis Dunes Rentals · glamisrent.com · (760) 573-6825 · Solo personal',
-      built: 'Sitio actualizado'
+      built: 'Sitio actualizado',
+      dl: 'Descargar PDF', dlCap: 'La hoja de una página, para imprimir y llenar a mano.', dlWorking: 'Preparando…', dlFail: 'No se pudo descargar. Revisa tu conexión e inténtalo otra vez.'
     }
   };
 
-  var DATA = null, LANG = 'en', IDX = {}, app = document.getElementById('app');
+  var DATA = null, LANG = 'en', IDX = {}, RAWKEY = null, app = document.getElementById('app');
 
   /* ---------- storage (never throws) ---------- */
   function sget(k) { try { return localStorage.getItem(k) || sessionStorage.getItem(k); } catch (e) { return null; } }
@@ -126,7 +128,7 @@
       BLOB = blob;
       var saved = sget(K_KEY), salt = sget(K_SALT);
       if (saved && salt === blob.salt) {
-        return openBlob(b64d(saved), blob).then(function (d) { DATA = d; start(); }).catch(function () { sdel(K_KEY); sdel(K_SALT); showLock(); });
+        return openBlob(b64d(saved), blob).then(function (d) { DATA = d; RAWKEY = b64d(saved); start(); }).catch(function () { sdel(K_KEY); sdel(K_SALT); showLock(); });
       }
       showLock();
     }).catch(function () { app.innerHTML = '<div class="loading">' + esc(t('offline')) + '</div>'; });
@@ -157,7 +159,7 @@
       derive(val, BLOB).then(function (r) { raw = r; return openBlob(r, BLOB); }).then(function (d) {
         var keep = $('#rem').checked;
         sset(K_KEY, b64e(raw), keep); sset(K_SALT, BLOB.salt, keep);
-        DATA = d; start();
+        DATA = d; RAWKEY = raw; start();
       }).catch(function () {
         btn.disabled = false; btn.textContent = t('unlock'); err.textContent = t('wrong'); pw.select();
       });
@@ -222,7 +224,7 @@
     var nav = $('#nav'); nav.innerHTML = h;
     $('#navClose').addEventListener('click', function () { toggleNav(false); });
     $$('a', nav).forEach(function (a) { a.addEventListener('click', function () { toggleNav(false); }); });
-    $('#lockBtn').addEventListener('click', function () { sdel(K_KEY); sdel(K_SALT); DATA = null; IDX = {}; location.hash = ''; showLock(); });
+    $('#lockBtn').addEventListener('click', function () { sdel(K_KEY); sdel(K_SALT); DATA = null; RAWKEY = null; IDX = {}; location.hash = ''; showLock(); });
     $('#printBtn').addEventListener('click', function () { toggleNav(false); setTimeout(function () { window.print(); }, 150); });
   }
 
@@ -283,7 +285,36 @@
       (next ? '<a class="nx" href="#/' + next + '"><small>' + esc(t('next')) + ' ›</small><span>' + esc(navLabel(next)) + '</span></a>' : '') +
       '</nav></div>' + footer();
     main.innerHTML = h;
+    if (p.pdf) addDownload($('#content'), p.pdf);
     enhance($('#content'), slug, grp);
+  }
+
+  /* ---------- printable PDF (encrypted like the site: dl/<name>.bin = 12-byte IV + AES-GCM ciphertext) ---------- */
+  function addDownload(root, pdf) {
+    var box = document.createElement('div'); box.className = 'dlbox';
+    box.innerHTML = '<button type="button" class="btn solid">' + esc(t('dl')) + '</button><span class="cap">' + esc(t('dlCap')) + '</span>';
+    var lead = $('.lead', root);
+    if (lead && lead.parentNode === root) lead.after(box); else root.prepend(box);
+    var btn = $('button', box);
+    btn.addEventListener('click', function () {
+      if (!RAWKEY) return;
+      btn.disabled = true; btn.textContent = t('dlWorking');
+      fetch(pdf.f).then(function (r) { if (!r.ok) throw new Error('http ' + r.status); return r.arrayBuffer(); }).then(function (buf) {
+        var u = new Uint8Array(buf);
+        return crypto.subtle.importKey('raw', RAWKEY, { name: 'AES-GCM' }, false, ['decrypt']).then(function (key) {
+          return crypto.subtle.decrypt({ name: 'AES-GCM', iv: u.slice(0, 12) }, key, u.slice(12));
+        });
+      }).then(function (pt) {
+        var url = URL.createObjectURL(new Blob([pt], { type: 'application/pdf' }));
+        var a = document.createElement('a'); a.href = url; a.download = pdf.n; a.rel = 'noopener';
+        document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(function () { URL.revokeObjectURL(url); }, 60000);
+        btn.disabled = false; btn.textContent = t('dl');
+      }).catch(function () {
+        btn.disabled = false; btn.textContent = t('dlFail');
+        setTimeout(function () { btn.textContent = t('dl'); }, 4000);
+      });
+    });
   }
 
   /* ---------- page enhancements ---------- */

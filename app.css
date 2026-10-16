@@ -181,6 +181,9 @@ ol.rules>li::before{content:counter(ru);position:absolute;left:12px;top:8px;widt
 .clcount{font-family:var(--cond);font-weight:700;font-size:15px;letter-spacing:.06em;color:var(--brown);white-space:nowrap}
 .btn{border:1.5px solid var(--brown);background:#fff;color:var(--brown);border-radius:8px;padding:8px 13px;font-family:var(--cond);font-weight:700;letter-spacing:.08em;text-transform:uppercase;font-size:14px;cursor:pointer;min-height:40px;white-space:nowrap}
 .btn.solid{background:var(--brown);color:#fff}
+.btn:disabled{opacity:.7;cursor:wait}
+.dlbox{display:flex;align-items:center;gap:8px 14px;flex-wrap:wrap;margin:14px 0 18px}
+.dlbox .cap{margin:0}
 
 /* home */
 .home-hero{position:relative;background:var(--brown);color:#fff;overflow:hidden}
@@ -233,7 +236,7 @@ ol.rules>li::before{content:counter(ru);position:absolute;left:12px;top:8px;widt
 
 /* ---------- print ---------- */
 @media print{
-  .top,.nav,.scrim,.cltools,.pn,.otp,.srch,.foot{display:none !important}
+  .top,.nav,.scrim,.cltools,.dlbox,.pn,.otp,.srch,.foot{display:none !important}
   body{font-size:11pt}
   .band{background:none;color:var(--brown);padding:0 0 8px;border-bottom:3px solid var(--brown)}
   .band h1{color:var(--brown)} .band .sum,.band .kick{color:var(--muted)} .edge{display:none}
