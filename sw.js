@@ -1,7 +1,7 @@
 /* Offline support: the site keeps working with a weak signal in the dunes.
    Pages and the encrypted bundle are network-first (fresh when online, cached when not); fonts and images are cache-first. */
-var CACHE = 'gdrh-ac177f2bcf';
-var CORE = ['./', 'index.html', 'app.css?v=ac177f2bcf', 'app.js?v=ac177f2bcf', 'fflate.min.js?v=ac177f2bcf', 'site.dat?v=ac177f2bcf',
+var CACHE = 'gdrh-d7deaca816';
+var CORE = ['./', 'index.html', 'app.css?v=d7deaca816', 'app.js?v=d7deaca816', 'fflate.min.js?v=d7deaca816', 'site.dat?v=d7deaca816',
   'assets/img/logo-600.png', 'assets/img/logo-240.png', 'assets/img/utv-sand.png'];
 self.addEventListener('install', function (e) {
   e.waitUntil(caches.open(CACHE).then(function (c) { return c.addAll(CORE); }).then(function () { return self.skipWaiting(); }));
