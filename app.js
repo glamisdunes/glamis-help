@@ -1,7 +1,7 @@
 /* Glamis Staff Help: unlocks the encrypted content bundle and renders it. */
 (function () {
   'use strict';
-  var VER = 'c5661e6a76';
+  var VER = '3cb4c91750';
   var K_KEY = 'gdrh.k', K_SALT = 'gdrh.s', K_LANG = 'gdrh.lang', K_CL = 'gdrh.cl.', K_NAME = 'gdrh.name', K_Q = 'gdrh.q';
   var GROUPS = ['checklist', 'handbook', 'howto', 'quickref'];
 
@@ -44,7 +44,15 @@
       subNotes: 'Notes for this rental (optional)', submit: 'Submit checklist', submitAgain: 'Not all ticked. Tap again to submit',
       needId: 'Fill in the booking ID at the top first.', submitted: 'Submitted. You can clear the checklist now.',
       cf: 'Copy for Checkfront', cfCap: 'Copies a short summary and opens the booking in Checkfront. Paste it into the booking notes.',
-      cfDone: 'Copied. Paste it into the booking notes.', cfManual: "Couldn't copy. Copy this text yourself:"
+      cfDone: 'Copied. Paste it into the booking notes.', cfManual: "Couldn't copy. Copy this text yourself:",
+      dropPick: 'Choose photos or videos', dropNote: 'Note (optional)', dropPh: 'What it shows and where you shot it.',
+      dropGo: 'Upload', dropRetry: 'Retry', dropClear: 'Clear list', dropEmpty: 'No files chosen yet.',
+      dropWait: 'Waiting', dropUp: 'Uploading', dropDone: 'Done', dropFail: "Didn't upload",
+      dropBig: 'Too big (over 5 GB)', dropType: 'Not a photo or video', dropZero: 'Empty file',
+      dropNeedName: 'Add your name first.', dropNeedFiles: 'Choose at least one photo or video first.',
+      dropKeep: 'Uploading. Keep this page open until every file says Done.',
+      dropAll: 'All uploaded. Thanks!', dropSome: "Some files didn't upload. Check your signal and tap Retry.",
+      dropOff: "Uploads aren't set up on the site yet. Tell a manager."
     },
     es: {
       app: 'Ayuda al personal', appShort: 'Ayuda', lockSub: 'Glamis Dunes Rentals · solo personal', pw: 'Contraseña del personal', show: 'Ver',
@@ -84,7 +92,15 @@
       subNotes: 'Notas de esta renta (opcional)', submit: 'Mandar lista', submitAgain: 'Faltan pasos. Toca otra vez para mandarla',
       needId: 'Primero llena el ID de la reservación arriba.', submitted: 'Enviada. Ya puedes borrar la lista.',
       cf: 'Copiar para Checkfront', cfCap: 'Copia un resumen corto y abre la reservación en Checkfront. Pégalo en las notas de la reservación.',
-      cfDone: 'Copiado. Pégalo en las notas de la reservación.', cfManual: 'No se pudo copiar. Copia este texto tú:'
+      cfDone: 'Copiado. Pégalo en las notas de la reservación.', cfManual: 'No se pudo copiar. Copia este texto tú:',
+      dropPick: 'Elegir fotos o videos', dropNote: 'Nota (opcional)', dropPh: 'Qué se ve y dónde lo grabaste.',
+      dropGo: 'Subir', dropRetry: 'Reintentar', dropClear: 'Borrar lista', dropEmpty: 'Todavía no elegiste archivos.',
+      dropWait: 'En espera', dropUp: 'Subiendo', dropDone: 'Listo', dropFail: 'No se subió',
+      dropBig: 'Muy grande (más de 5 GB)', dropType: 'No es foto ni video', dropZero: 'Archivo vacío',
+      dropNeedName: 'Primero escribe tu nombre.', dropNeedFiles: 'Primero elige al menos una foto o un video.',
+      dropKeep: 'Subiendo. Deja esta página abierta hasta que cada archivo diga Listo.',
+      dropAll: 'Todo se subió. ¡Gracias!', dropSome: 'Algunos archivos no se subieron. Revisa tu señal y toca Reintentar.',
+      dropOff: 'Las subidas todavía no están listas en el sitio. Avísale a un gerente.'
     }
   };
 
@@ -316,6 +332,7 @@
     main.innerHTML = h;
     if (p.pdf) addDownload($('#content'), p.pdf);
     enhance($('#content'), slug, grp);
+    var dz = $('.drop', $('#content')); if (dz) mountDrop(dz, slug);
     if (DATA.log) addFeedback($('#content'), slug);
   }
 
@@ -441,6 +458,182 @@
     if (ok) return Promise.resolve(true);
     if (navigator.clipboard && navigator.clipboard.writeText) return navigator.clipboard.writeText(s).then(function () { return true; }, function () { return false; });
     return Promise.resolve(false);
+  }
+
+  /* ---------- content drop: photos and videos straight to Google Drive ----------
+     DATA.drop = { url: the Apps Script web app (/exec), t: its token, chunk: bytes per piece }.
+     For each file the web app starts a resumable Drive upload in today's folder and returns the session URL;
+     the file then goes from the phone to Drive in pieces, and picks up where it stopped after a dropped signal.
+     The state lives here, not in the page, so an upload keeps going if you open another page and shows again when you come back. */
+  var DROP = { items: [], running: false, box: null, slug: '', note: '', msg: '', bad: false, wl: null, who: '' };
+  var MAXB = 5 * 1024 * 1024 * 1024;
+  var MIME = { jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', heic: 'image/heic', heif: 'image/heif', webp: 'image/webp', gif: 'image/gif',
+    dng: 'image/x-adobe-dng', mov: 'video/quicktime', mp4: 'video/mp4', m4v: 'video/x-m4v', '3gp': 'video/3gpp', avi: 'video/x-msvideo',
+    mkv: 'video/x-matroska', webm: 'video/webm', hevc: 'video/hevc', mts: 'video/mp2t' };
+  function extOf(n) { var m = /\.([a-z0-9]+)$/i.exec(n || ''); return m ? m[1].toLowerCase() : ''; }
+  function mimeOf(f) { return /^(image|video)\//.test(f.type || '') ? f.type : (MIME[extOf(f.name)] || ''); }
+  function fmtSize(b) { return b >= 1073741824 ? (b / 1073741824).toFixed(2) + ' GB' : b >= 1048576 ? (b / 1048576).toFixed(1) + ' MB' : (b ? Math.max(1, Math.round(b / 1024)) : 0) + ' KB'; }
+  function delay(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+  function stampPT() {
+    var p = {}, z = function (n) { return ('0' + n).slice(-2); };
+    try {
+      new Intl.DateTimeFormat('en-US', { timeZone: 'America/Los_Angeles', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' })
+        .formatToParts(new Date()).forEach(function (x) { p[x.type] = x.value; });
+    } catch (e) { var d = new Date(); p = { year: d.getFullYear(), month: z(d.getMonth() + 1), day: z(d.getDate()), hour: z(d.getHours()), minute: z(d.getMinutes()) }; }
+    return p.year + '-' + p.month + '-' + p.day + ' ' + p.hour + p.minute;
+  }
+  function wake(on) {
+    try {
+      if (on && navigator.wakeLock && !DROP.wl) navigator.wakeLock.request('screen').then(function (l) { DROP.wl = l; }, function () {});
+      if (!on && DROP.wl) { DROP.wl.release(); DROP.wl = null; }
+    } catch (e) {}
+  }
+  document.addEventListener('visibilitychange', function () { if (DROP.running && document.visibilityState === 'visible') { DROP.wl = null; wake(true); } });
+  window.addEventListener('beforeunload', function (e) { if (DROP.running) { e.preventDefault(); e.returnValue = ''; } });
+
+  function mountDrop(box, slug) {
+    DROP.box = box; DROP.slug = slug;
+    if (!DATA.drop) { box.innerHTML = '<p class="msg bad">' + esc(t('dropOff')) + '</p>'; return; }
+    box.innerHTML = '<input type="file" multiple accept="image/*,video/*" class="offscreen" tabindex="-1" aria-hidden="true">' +
+      '<button type="button" class="btn solid dpick" data-act="pick">' + esc(t('dropPick')) + '</button>' +
+      '<ul class="dlist"></ul>' +
+      '<label class="fl">' + esc(t('dropNote')) + '<textarea class="fi" rows="2" name="dnote" placeholder="' + esc(t('dropPh')) + '"></textarea></label>' +
+      '<label class="fl">' + esc(t('yourName')) + '<input class="fi" name="dname" autocomplete="name"></label>' +
+      '<div class="brow"><button type="button" class="btn solid" data-act="go"></button><button type="button" class="btn" data-act="clr">' + esc(t('dropClear')) + '</button></div>' +
+      '<p class="msg" role="status" aria-live="polite"></p>';
+    var input = $('input[type=file]', box), note = $('[name=dnote]', box), name = $('[name=dname]', box);
+    note.value = DROP.note; name.value = DROP.who || savedName();
+    note.addEventListener('input', function () { DROP.note = note.value; });
+    $('[data-act=pick]', box).addEventListener('click', function () { input.click(); });
+    input.addEventListener('change', function () { addFiles(input.files); input.value = ''; });
+    $('[data-act=go]', box).addEventListener('click', dropRun);
+    $('[data-act=clr]', box).addEventListener('click', function () { if (DROP.running) return; DROP.items = []; dropMsg(''); drawDrop(); });
+    drawDrop();
+  }
+  function dropMsg(s, bad) { DROP.msg = s || ''; DROP.bad = !!bad; var m = DROP.box && DROP.box.isConnected && $('.msg', DROP.box); if (m) setMsg(m, DROP.msg, DROP.bad); }
+  function addFiles(list) {
+    Array.prototype.forEach.call(list || [], function (f) {
+      if (DROP.items.some(function (x) { return x.file.name === f.name && x.file.size === f.size && x.file.lastModified === f.lastModified; })) return;
+      var it = { file: f, st: 'wait', off: 0, prog: 0, sess: null, why: '' };
+      if (!mimeOf(f)) { it.st = 'bad'; it.why = 'dropType'; }
+      else if (!f.size) { it.st = 'bad'; it.why = 'dropZero'; }
+      else if (f.size > MAXB) { it.st = 'bad'; it.why = 'dropBig'; }
+      DROP.items.push(it);
+    });
+    if (!DROP.running) dropMsg('');
+    drawDrop();
+  }
+  function drawDrop() {
+    var box = DROP.box; if (!box || !box.isConnected || !DATA || !DATA.drop) return;
+    $('.dlist', box).innerHTML = DROP.items.length ? DROP.items.map(function (it, i) {
+      return '<li data-i="' + i + '"><span class="dn">' + esc(it.file.name) + '</span><span class="ds"></span><span class="dbar"><i></i></span></li>';
+    }).join('') : '<li class="none">' + esc(t('dropEmpty')) + '</li>';
+    DROP.items.forEach(drawItem);
+    var go = $('[data-act=go]', box), fail = DROP.items.some(function (x) { return x.st === 'fail'; });
+    go.textContent = DROP.running ? t('dropUp') + '…' : t(fail ? 'dropRetry' : 'dropGo'); go.disabled = DROP.running;
+    $('[data-act=clr]', box).disabled = DROP.running;
+    setMsg($('.msg', box), DROP.msg, DROP.bad);
+  }
+  function drawItem(it) {
+    var box = DROP.box; if (!box || !box.isConnected) return;
+    var li = $('.dlist li[data-i="' + DROP.items.indexOf(it) + '"]', box); if (!li) return;
+    var pct = it.st === 'done' ? 100 : Math.min(99, Math.floor(100 * (it.prog || 0) / (it.file.size || 1)));
+    li.className = it.st;
+    $('.ds', li).textContent = fmtSize(it.file.size) + ' · ' + (it.st === 'up' ? t('dropUp') + ' ' + pct + '%' :
+      t(it.st === 'bad' ? it.why : { wait: 'dropWait', done: 'dropDone', fail: 'dropFail' }[it.st]));
+    $('.dbar i', li).style.width = (it.st === 'bad' ? 0 : pct) + '%';
+  }
+  function dropRun() {
+    var box = DROP.box; if (DROP.running || !box || !DATA || !DATA.drop) return;
+    var nameEl = $('[name=dname]', box), nm = nameEl.value.trim();
+    var todo = DROP.items.filter(function (x) { return x.st === 'wait' || x.st === 'fail'; });
+    if (!todo.length) { dropMsg(t('dropNeedFiles'), true); return; }
+    if (!nm) { dropMsg(t('dropNeedName'), true); nameEl.focus(); return; }
+    try { localStorage.setItem(K_NAME, nm); } catch (e) {}
+    DROP.running = true; DROP.who = nm; DROP.note = $('[name=dnote]', box).value.trim();
+    todo.forEach(function (x) { x.st = 'wait'; });
+    var sent = [];
+    wake(true); dropMsg(t('dropKeep')); drawDrop();
+    (function next() {
+      var it = DATA && DATA.drop && DROP.items.filter(function (x) { return x.st === 'wait'; })[0];
+      if (!it) {
+        DROP.running = false; wake(false);
+        var failed = DROP.items.filter(function (x) { return x.st === 'fail'; });
+        dropMsg(failed.length ? t('dropSome') : t('dropAll'), !!failed.length); drawDrop();
+        if (sent.length && DATA && DATA.log) logSend({ type: 'Content drop', name: nm, page: enTitle(DROP.slug), details: dropReport(sent, failed), lang: LANG });
+        return;
+      }
+      it.st = 'up'; drawItem(it);
+      sendFile(it, DATA.drop).then(function () { it.st = 'done'; sent.push(it); }, function (e) { it.st = 'fail'; it.err = String((e && e.message) || e); })
+        .then(function () { drawDrop(); next(); });
+    })();
+  }
+  function dropReport(sent, failed) {
+    var folders = sent.map(function (x) { return x.folder; }).filter(function (f, i, a) { return f && a.indexOf(f) === i; });
+    return ['Files uploaded: ' + sent.length + (folders.length ? ' (folder ' + folders.join(', ') + ')' : '')]
+      .concat(sent.map(function (x) { return '- ' + x.dname + ' (' + fmtSize(x.file.size) + ')'; }),
+        failed.length ? ["Didn't upload: " + failed.length].concat(failed.map(function (x) { return '- ' + x.file.name + ' (' + fmtSize(x.file.size) + ')'; })) : [],
+        DROP.note ? ['Note: ' + DROP.note] : []).join('\n');
+  }
+  // One PUT to the Drive upload session. A piece of the file, or blob = null to ask how much Drive already has.
+  function drivePut(url, blob, range, onprog) {
+    return new Promise(function (res, rej) {
+      var x = new XMLHttpRequest();
+      x.open('PUT', url, true);
+      x.setRequestHeader('Content-Range', range);
+      x.timeout = 300000;
+      if (onprog && x.upload) x.upload.onprogress = function (e) { onprog(e.loaded); };
+      x.onload = function () { res({ status: x.status, range: x.getResponseHeader('Range') }); };
+      x.onerror = x.ontimeout = x.onabort = function () { rej(new Error('network')); };
+      x.send(blob);
+    });
+  }
+  function sendFile(it, D) {
+    var f = it.file, size = f.size, CH = D.chunk || 4194304, tries = 0, restarts = 0, stuck = 0;
+    function got(r) { var m = /bytes=0-(\d+)/.exec(r.range || ''); return m ? +m[1] + 1 : 0; }
+    function start() {
+      it.dname = stampPT() + ' ' + DROP.who + ' - ' + f.name;
+      var ac = window.AbortController ? new AbortController() : null, timer = ac && setTimeout(function () { ac.abort(); }, 60000);
+      return fetch(D.url, { method: 'POST', credentials: 'omit', referrerPolicy: 'no-referrer', signal: ac ? ac.signal : undefined,
+        body: JSON.stringify({ token: D.t, name: it.dname, type: mimeOf(f), size: size, origin: location.origin,
+          description: (DROP.note ? DROP.note + '\n\n' : '') + 'Sent by ' + DROP.who + ' from the Glamis Staff Help site.' }) })
+        .then(function (r) { clearTimeout(timer); if (!r.ok) throw new Error('start http ' + r.status); return r.json(); })
+        .then(function (j) { if (!j || !j.ok || !j.url) throw new Error('start ' + (j && j.error)); it.sess = j.url; it.folder = j.folder || ''; it.off = it.prog = 0; });
+    }
+    function step() {
+      if (it.complete) return Promise.resolve();
+      if (!it.sess) return start().then(step);
+      var end = Math.min(it.off + CH, size);
+      return drivePut(it.sess, f.slice(it.off, end), 'bytes ' + it.off + '-' + (end - 1) + '/' + size, function (n) { it.prog = it.off + n; drawItem(it); })
+        .then(function (r) {
+          if (r.status === 200 || r.status === 201) { it.complete = true; it.off = it.prog = size; return; }
+          if (r.status === 308) {
+            var off = got(r); stuck = off > it.off ? 0 : stuck + 1;
+            if (stuck > 3) throw new Error('no progress');
+            it.off = it.prog = off; tries = 0; drawItem(it); return step();
+          }
+          if (r.status === 404 || r.status === 410) {
+            if (++restarts > 2) throw new Error('session ' + r.status);
+            it.sess = null; it.off = it.prog = 0; return step();
+          }
+          throw new Error('http ' + r.status);
+        });
+    }
+    function resync() {
+      if (!it.sess || it.complete) return Promise.resolve();
+      return drivePut(it.sess, null, 'bytes */' + size).then(function (r) {
+        if (r.status === 200 || r.status === 201) { it.complete = true; it.off = it.prog = size; }
+        else if (r.status === 308) it.off = it.prog = got(r);
+        else if (r.status === 404 || r.status === 410) { it.sess = null; it.off = it.prog = 0; }
+      }, function () {});
+    }
+    function attempt() {
+      return step().catch(function (e) {
+        if (++tries > 5 || navigator.onLine === false) throw e;
+        return delay(Math.min(30000, 1000 * Math.pow(2, tries))).then(resync).then(attempt);
+      });
+    }
+    return resync().then(attempt);
   }
 
   /* ---------- page enhancements ---------- */

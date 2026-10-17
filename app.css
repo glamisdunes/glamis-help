@@ -206,6 +206,21 @@ textarea.fi{resize:vertical;line-height:1.45}
 .fbin .cap{font-size:14px;line-height:1.45;color:var(--muted);margin:0}
 .offscreen{position:fixed;top:-1000px;left:0;width:1px;height:1px;opacity:0}
 
+/* content drop (photo and video uploads) */
+.drop{margin:14px 0 6px;padding:16px 16px 8px;border:2px solid var(--brown);border-radius:12px;background:var(--tint2)}
+.drop .dpick{width:100%;min-height:52px;font-size:17px}
+.content ul.dlist{list-style:none;margin:10px 0 0;padding:0}
+.content ul.dlist li{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:3px 10px;align-items:baseline;margin:0;padding:10px 0;border-bottom:1px solid var(--line)}
+.content ul.dlist li.none{display:block;color:var(--muted);font-size:14.5px;border:0;padding:8px 0 2px}
+.dlist .dn{font-weight:600;color:var(--brown);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dlist .ds{font-family:var(--cond);font-weight:700;font-size:14px;letter-spacing:.03em;color:var(--muted);white-space:nowrap}
+.dlist .dbar{grid-column:1 / -1;height:6px;background:var(--tint);border-radius:999px;overflow:hidden}
+.dlist .dbar i{display:block;height:100%;width:0;background:var(--sand);transition:width .2s}
+.dlist li.done .dbar i{background:var(--green)}
+.dlist li.done .ds{color:var(--green)}
+.dlist li.fail .ds,.dlist li.bad .ds{color:var(--rust)}
+.dlist li.bad .dbar{display:none}
+
 /* home */
 .home-hero{position:relative;background:var(--brown);color:#fff;overflow:hidden}
 .home-hero .in{position:relative;max-width:var(--max);margin:0 auto;padding:26px 16px 26px}
@@ -257,7 +272,7 @@ textarea.fi{resize:vertical;line-height:1.45}
 
 /* ---------- print ---------- */
 @media print{
-  .top,.nav,.scrim,.cltools,.dlbox,.subbox,.fb,.pn,.otp,.srch,.foot{display:none !important}
+  .top,.nav,.scrim,.cltools,.dlbox,.subbox,.drop,.fb,.pn,.otp,.srch,.foot{display:none !important}
   body{font-size:11pt}
   .band{background:none;color:var(--brown);padding:0 0 8px;border-bottom:3px solid var(--brown)}
   .band h1{color:var(--brown)} .band .sum,.band .kick{color:var(--muted)} .edge{display:none}
