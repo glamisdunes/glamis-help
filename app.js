@@ -1,9 +1,9 @@
 /* Glamis Staff Help: unlocks the encrypted content bundle and renders it. */
 (function () {
   'use strict';
-  var VER = '280ad48a47';
-  var K_KEY = 'gdrh.k', K_SALT = 'gdrh.s', K_LANG = 'gdrh.lang', K_CL = 'gdrh.cl.';
-  var GROUPS = ['checklist', 'howto', 'handbook', 'quickref'];
+  var VER = '3161c79cf8';
+  var K_KEY = 'gdrh.k', K_SALT = 'gdrh.s', K_LANG = 'gdrh.lang', K_CL = 'gdrh.cl.', K_NAME = 'gdrh.name', K_Q = 'gdrh.q';
+  var GROUPS = ['checklist', 'handbook', 'howto', 'quickref'];
 
   var T = {
     en: {
@@ -30,7 +30,21 @@
       notFound: "That page doesn't exist.", backHome: 'Go to the home page',
       foot: 'Glamis Dunes Rentals · glamisrent.com · (760) 573-6825 · Staff only',
       built: 'Site updated',
-      dl: 'Download PDF', dlCap: 'The one-page sheet, to print and fill in by hand.', dlWorking: 'Preparing…', dlFail: "Couldn't download it. Check your connection and try again."
+      dl: 'Download PDF', dlCap: 'The one-page sheet, to print and fill in by hand.', dlWorking: 'Preparing…', dlFail: "Couldn't download it. Check your connection and try again.",
+      fbTitle: 'Something wrong or missing on this page?',
+      fbIntro: "Info that conflicts with another page, a mistake, or a step that doesn't match what you see? Send a note. It goes to the managers.",
+      fbKind: 'What kind?', kinds: { conflict: 'Conflicting info', mistake: 'Mistake', missing: 'Missing or unclear', other: 'Other' },
+      fbPart: 'Which part?', fbWhole: 'Whole page', fbNote: 'Your note',
+      fbPh: "What's wrong, what it should say, and where you saw the other info.",
+      yourName: 'Your name', send: 'Send note', sending: 'Sending…', sent: 'Sent. Thanks!',
+      queued: "No signal. It's saved on this device and sends by itself when you're back online.",
+      needNote: 'Add your name and a note first.', waiting: 'saved on this device, waiting to send.',
+      sendFail: "Couldn't send it. Check your connection and try again.",
+      subTitle: 'Finished?', subIntro: 'Submit the checklist to save it with the booking ID. Then tap Clear at the top for the next rental.',
+      subNotes: 'Notes for this rental (optional)', submit: 'Submit checklist', submitAgain: 'Not all ticked. Tap again to submit',
+      needId: 'Fill in the booking ID at the top first.', submitted: 'Submitted. You can clear the checklist now.',
+      cf: 'Copy for Checkfront', cfCap: 'Copies a short summary and opens the booking in Checkfront. Paste it into the booking notes.',
+      cfDone: 'Copied. Paste it into the booking notes.', cfManual: "Couldn't copy. Copy this text yourself:"
     },
     es: {
       app: 'Ayuda al personal', appShort: 'Ayuda', lockSub: 'Glamis Dunes Rentals · solo personal', pw: 'Contraseña del personal', show: 'Ver',
@@ -56,7 +70,21 @@
       notFound: 'Esa página no existe.', backHome: 'Ir al inicio',
       foot: 'Glamis Dunes Rentals · glamisrent.com · (760) 573-6825 · Solo personal',
       built: 'Sitio actualizado',
-      dl: 'Descargar PDF', dlCap: 'La hoja de una página, para imprimir y llenar a mano.', dlWorking: 'Preparando…', dlFail: 'No se pudo descargar. Revisa tu conexión e inténtalo otra vez.'
+      dl: 'Descargar PDF', dlCap: 'La hoja de una página, para imprimir y llenar a mano.', dlWorking: 'Preparando…', dlFail: 'No se pudo descargar. Revisa tu conexión e inténtalo otra vez.',
+      fbTitle: '¿Algo está mal o falta algo en esta página?',
+      fbIntro: '¿Información que no coincide con otra página, un error o un paso que no es igual a lo que ves? Manda una nota. Les llega a los gerentes.',
+      fbKind: '¿Qué tipo?', kinds: { conflict: 'Información que no coincide', mistake: 'Error', missing: 'Falta o no está claro', other: 'Otro' },
+      fbPart: '¿Qué parte?', fbWhole: 'Toda la página', fbNote: 'Tu nota',
+      fbPh: 'Qué está mal, qué debería decir y dónde viste la otra información.',
+      yourName: 'Tu nombre', send: 'Mandar nota', sending: 'Mandando…', sent: 'Enviada. ¡Gracias!',
+      queued: 'Sin señal. Se guardó en este dispositivo y se manda sola cuando vuelvas a tener conexión.',
+      needNote: 'Primero escribe tu nombre y una nota.', waiting: 'guardado(s) en este dispositivo, esperando para mandarse.',
+      sendFail: 'No se pudo mandar. Revisa tu conexión e inténtalo otra vez.',
+      subTitle: '¿Terminaste?', subIntro: 'Manda la lista para guardarla con el ID de la reservación. Después toca Borrar arriba para la siguiente renta.',
+      subNotes: 'Notas de esta renta (opcional)', submit: 'Mandar lista', submitAgain: 'Faltan pasos. Toca otra vez para mandarla',
+      needId: 'Primero llena el ID de la reservación arriba.', submitted: 'Enviada. Ya puedes borrar la lista.',
+      cf: 'Copiar para Checkfront', cfCap: 'Copia un resumen corto y abre la reservación en Checkfront. Pégalo en las notas de la reservación.',
+      cfDone: 'Copiado. Pégalo en las notas de la reservación.', cfManual: 'No se pudo copiar. Copia este texto tú:'
     }
   };
 
@@ -201,6 +229,7 @@
     renderNav();
     window.onhashchange = route;
     route();
+    flushQueue();
     if ('serviceWorker' in navigator && location.protocol === 'https:') { navigator.serviceWorker.register('sw.js').catch(function () {}); }
   }
 
@@ -287,6 +316,7 @@
     main.innerHTML = h;
     if (p.pdf) addDownload($('#content'), p.pdf);
     enhance($('#content'), slug, grp);
+    if (DATA.log) addFeedback($('#content'), slug);
   }
 
   /* ---------- printable PDF (encrypted like the site: dl/<name>.bin = 12-byte IV + AES-GCM ciphertext) ---------- */
@@ -315,6 +345,102 @@
         setTimeout(function () { btn.textContent = t('dl'); }, 4000);
       });
     });
+  }
+
+  /* ---------- staff log: page feedback and submitted checklists ----------
+     Each one is posted to a Google Form (DATA.log = { url, f: form field names }) and lands as a row in its Google Sheet.
+     Rows are always in English (titles and labels from the English page) so they sort and filter the same.
+     No signal? It waits in localStorage (gdrh.q) and goes out on the next start or when the device is back online. */
+  function nowPT() {
+    try { return new Date().toLocaleString('en-US', { timeZone: 'America/Los_Angeles', dateStyle: 'medium', timeStyle: 'short' }); }
+    catch (e) { return new Date().toString(); }
+  }
+  function qget() { try { var q = JSON.parse(localStorage.getItem(K_Q) || '[]'); return Array.isArray(q) ? q : []; } catch (e) { return []; } }
+  function qset(q) { try { if (q.length) localStorage.setItem(K_Q, JSON.stringify(q)); else localStorage.removeItem(K_Q); return true; } catch (e) { return false; } }
+  function postLog(d) {
+    var L = DATA && DATA.log; if (!L || !window.fetch) return Promise.reject(new Error('no log'));
+    var body = new URLSearchParams();
+    Object.keys(L.f).forEach(function (k) { if (d[k]) body.append(L.f[k], String(d[k])); });
+    var ac = window.AbortController ? new AbortController() : null, timer = ac && setTimeout(function () { ac.abort(); }, 20000);
+    return fetch(L.url, { method: 'POST', mode: 'no-cors', credentials: 'omit', referrerPolicy: 'no-referrer', body: body, signal: ac ? ac.signal : undefined })
+      .then(function (r) { clearTimeout(timer); return r; }, function (e) { clearTimeout(timer); throw e; });
+  }
+  function logSend(d) {
+    d.id = Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+    d.at = nowPT();
+    return postLog(d).then(function () { flushQueue(); return 'sent'; }, function () {
+      var q = qget(); q.push(d); return qset(q) ? 'queued' : 'failed';
+    });
+  }
+  var flushing = false;
+  function flushQueue() {
+    if (flushing || !DATA || !DATA.log) return;
+    var q = qget(); if (!q.length) return;
+    flushing = true;
+    var item = q[0];
+    postLog(item).then(function () {
+      qset(qget().filter(function (x) { return x.id !== item.id; })); flushing = false; flushQueue();
+    }, function () { flushing = false; });
+  }
+  window.addEventListener('online', flushQueue);
+
+  var EN_DOM = {};
+  function enDom(slug) {
+    if (!EN_DOM[slug]) {
+      var d = document.implementation.createHTMLDocument('').createElement('div');
+      d.innerHTML = (pagesFor('en')[slug] || {}).html || ''; EN_DOM[slug] = d;
+    }
+    return EN_DOM[slug];
+  }
+  function enTitle(slug) { return (pagesFor('en')[slug] || {}).title || slug; }
+  function enSecTitle(slug, id) {
+    var s = $$('section.sec[id]', enDom(slug)).filter(function (x) { return x.id === id; })[0], h = s && $('h2', s);
+    return h ? h.textContent.trim() : id;
+  }
+  function setMsg(el, s, bad) { el.textContent = s || ''; el.classList.toggle('bad', !!bad); }
+  function savedName() { try { return localStorage.getItem(K_NAME) || ''; } catch (e) { return ''; } }
+
+  function addFeedback(content, slug) {
+    var page = content.parentNode, kinds = t('kinds'), cur = parseHash().sec;
+    var secs = $$('section.sec[id]', content).filter(function (s) { return $('h2', s); });
+    var d = document.createElement('details'); d.className = 'fb';
+    d.innerHTML = '<summary>' + esc(t('fbTitle')) + '</summary><div class="fbin">' +
+      '<p class="cap">' + esc(t('fbIntro')) + '</p><div class="fgrid">' +
+      '<label class="fl">' + esc(t('fbKind')) + '<select class="fi" name="kind">' +
+      Object.keys(kinds).map(function (k) { return '<option value="' + k + '">' + esc(kinds[k]) + '</option>'; }).join('') + '</select></label>' +
+      '<label class="fl">' + esc(t('fbPart')) + '<select class="fi" name="part"><option value="">' + esc(t('fbWhole')) + '</option>' +
+      secs.map(function (s) { return '<option value="' + esc(s.id) + '"' + (s.id === cur ? ' selected' : '') + '>' + esc($('h2', s).textContent.trim()) + '</option>'; }).join('') +
+      '</select></label></div>' +
+      '<label class="fl">' + esc(t('fbNote')) + '<textarea class="fi" name="note" rows="4" placeholder="' + esc(t('fbPh')) + '"></textarea></label>' +
+      '<label class="fl">' + esc(t('yourName')) + '<input class="fi" name="name" autocomplete="name"></label>' +
+      '<div class="brow"><button type="button" class="btn solid">' + esc(t('send')) + '</button></div>' +
+      '<p class="msg" role="status" aria-live="polite"></p></div>';
+    page.insertBefore(d, $('.pn', page));
+    var btn = $('button', d), msg = $('.msg', d), note = $('[name=note]', d), name = $('[name=name]', d), kind = $('[name=kind]', d), part = $('[name=part]', d);
+    name.value = savedName();
+    var waiting = qget().length; if (waiting) setMsg(msg, waiting + ' ' + t('waiting'), true);
+    btn.addEventListener('click', function () {
+      var n = name.value.trim(), x = note.value.trim();
+      if (!n || !x) { setMsg(msg, t('needNote'), true); (x ? name : note).focus(); return; }
+      try { localStorage.setItem(K_NAME, n); } catch (e) {}
+      btn.disabled = true; btn.textContent = t('sending'); setMsg(msg, '');
+      logSend({ type: 'Feedback · ' + T.en.kinds[kind.value], name: n, page: enTitle(slug), section: part.value ? enSecTitle(slug, part.value) : '', details: x, lang: LANG }).then(function (r) {
+        btn.disabled = false; btn.textContent = t('send');
+        if (r !== 'failed') note.value = '';
+        setMsg(msg, r === 'sent' ? t('sent') : r === 'queued' ? t('queued') : t('sendFail'), r !== 'sent');
+      });
+    });
+  }
+
+  function copyText(s) {
+    var ok = false, ta = document.createElement('textarea');
+    ta.value = s; ta.setAttribute('readonly', ''); ta.className = 'offscreen';
+    document.body.appendChild(ta); ta.select(); ta.setSelectionRange(0, s.length);
+    try { ok = document.execCommand('copy'); } catch (e) {}
+    ta.remove();
+    if (ok) return Promise.resolve(true);
+    if (navigator.clipboard && navigator.clipboard.writeText) return navigator.clipboard.writeText(s).then(function () { return true; }, function () { return false; });
+    return Promise.resolve(false);
   }
 
   /* ---------- page enhancements ---------- */
@@ -380,8 +506,70 @@
         if (!armed) { armed = true; cb.textContent = t('clearAgain'); cb.classList.add('solid'); timer = setTimeout(function () { armed = false; cb.textContent = t('clear'); cb.classList.remove('solid'); }, 3000); return; }
         clearTimeout(timer); armed = false; cb.textContent = t('clear'); cb.classList.remove('solid');
         st = { c: [], f: {} }; items.forEach(function (li) { li.classList.remove('on'); li.setAttribute('aria-checked', 'false'); }); fields.forEach(function (f) { f.value = ''; }); save();
+        notesEl.value = ''; setMsg(smsg, ''); manual.classList.add('hidden');
       });
       update();
+
+      // Submit (to the staff log) and Copy for Checkfront
+      var sb = document.createElement('section'); sb.className = 'subbox';
+      sb.innerHTML = '<h2>' + esc(t('subTitle')) + '</h2><p class="cap">' + esc(t('subIntro')) + '</p>' +
+        '<label class="fl">' + esc(t('subNotes')) + '<textarea class="fi" rows="3"></textarea></label>' +
+        '<div class="brow">' + (DATA.log ? '<button type="button" class="btn solid" data-act="sub">' + esc(t('submit')) + '</button>' : '') +
+        '<button type="button" class="btn" data-act="cf">' + esc(t('cf')) + '</button></div>' +
+        '<p class="cap">' + esc(t('cfCap')) + '</p><p class="msg" role="status" aria-live="polite"></p>' +
+        '<textarea class="fi hidden" readonly rows="4" aria-label="' + esc(t('cf')) + '"></textarea>';
+      root.appendChild(sb);
+      var notesEl = $('label textarea', sb), smsg = $('.msg', sb), sbtn = $('[data-act=sub]', sb), cfbtn = $('[data-act=cf]', sb), manual = $('textarea[readonly]', sb);
+      notesEl.value = st.n || '';
+      notesEl.addEventListener('input', function () { st.n = notesEl.value; save(); });
+      function bookingId() { return fields[0] ? fields[0].value.trim() : ''; }
+      function needId() { setMsg(smsg, t('needId'), true); if (fields[0]) { fields[0].scrollIntoView({ block: 'center' }); fields[0].focus(); } }
+      function report() {
+        var en = enDom(slug), enItems = $$('ul.checks > li', en), enLabels = $$('.fields label', en), title = enTitle(slug);
+        var head = [], staff = [], secs = [], miss = [], n = 0;
+        fields.forEach(function (f, i) {
+          var lab = enLabels[i] ? enLabels[i].textContent.trim() : 'Field ' + (i + 1), v = f.value.trim();
+          if (i === 0) head.push(lab + ': ' + v); else if (v) staff.push(lab + ': ' + v);
+        });
+        items.forEach(function (li, i) {
+          var on = li.classList.contains('on'), e = enItems[i], sec = e && e.closest('section.sec'), h2 = sec && $('h2', sec), h = h2 ? h2.textContent.trim() : '';
+          var g = secs.filter(function (x) { return x.h === h; })[0];
+          if (!g) { g = { h: h, n: 0, of: 0 }; secs.push(g); }
+          g.of++; if (on) { g.n++; n++; }
+          if (!on) { var b = e && $('b', e); miss.push((h ? h + ' ' : '') + (b ? b.textContent : e ? e.textContent : '').trim().replace(/[\s:,.;]+$/, '').slice(0, 90)); }
+        });
+        var notes = notesEl.value.trim(), ticked = 'Steps ticked: ' + n + ' of ' + items.length;
+        var long = [title].concat(head, staff, [ticked], secs.map(function (g) { return '  ' + (g.h || '-') + ': ' + g.n + ' of ' + g.of; }),
+          miss.length ? ['Not ticked:'].concat(miss.map(function (m) { return '- ' + m; })) : [], notes ? ['Notes: ' + notes] : []).join('\n');
+        var short = title + ', ' + nowPT() + '. ' + (staff.length ? staff.join('. ') + '. ' : '') + ticked + '.' + (notes ? ' Notes: ' + notes : '');
+        return { title: title, long: long, short: short, name: (fields[1] && fields[1].value.trim()) || savedName() };
+      }
+      var sarmed = false, stimer;
+      if (sbtn) sbtn.addEventListener('click', function () {
+        if (!bookingId()) { needId(); return; }
+        var done = items.filter(function (li) { return li.classList.contains('on'); }).length;
+        if (done < items.length && !sarmed) {
+          sarmed = true; sbtn.textContent = t('submitAgain');
+          stimer = setTimeout(function () { sarmed = false; sbtn.textContent = t('submit'); }, 4000); return;
+        }
+        clearTimeout(stimer); sarmed = false;
+        var r = report();
+        sbtn.disabled = true; sbtn.textContent = t('sending'); setMsg(smsg, '');
+        logSend({ type: 'Checklist', name: r.name, page: r.title, booking: bookingId(), details: r.long, lang: LANG }).then(function (res) {
+          sbtn.disabled = false; sbtn.textContent = t('submit');
+          setMsg(smsg, res === 'sent' ? t('submitted') : res === 'queued' ? t('queued') : t('sendFail'), res !== 'sent');
+        });
+      });
+      cfbtn.addEventListener('click', function () {
+        var id = bookingId();
+        if (!id) { needId(); return; }
+        var txt = report().short, copied = copyText(txt);
+        window.open('https://glamisrent.checkfront.com/booking/' + encodeURIComponent(id.toUpperCase()) + '/', '_blank', 'noopener');
+        copied.then(function (ok) {
+          if (ok) { setMsg(smsg, t('cfDone')); manual.classList.add('hidden'); return; }
+          setMsg(smsg, t('cfManual'), true); manual.value = txt; manual.classList.remove('hidden'); manual.select();
+        });
+      });
     }
   }
 
